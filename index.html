@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaMask Smart Contract Reader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 30px 16px;
+      color: #222;
+    }
+    .container {
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 25px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 24px; text-align: center; }
+    p { line-height: 1.5; overflow-wrap: anywhere; }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 0;
+      border-radius: 7px;
+      background: #f6851b;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .result {
+      padding: 12px;
+      background: #f4f6f8;
+      border-radius: 7px;
+      min-height: 24px;
+      overflow-wrap: anywhere;
+    }
+    .hint { font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>MetaMask Smart Contract Reader</h1>
+    <p>Connect your MetaMask wallet, then read the message stored in a smart contract.</p>
+
+    <button id="connectButton">Connect MetaMask</button>
+
+    <p><strong>Wallet Address:</strong></p>
+    <div id="walletAddress" class="result">Not connected</div>
+
+    <button id="readButton" disabled>Read Smart Contract Message</button>
+
+    <p><strong>Contract Message:</strong></p>
+    <div id="contractMessage" class="result">No message read yet.</div>
+
+    <p id="status" class="hint">Status: Waiting for connection.</p>
+  </main>
+
+  <!-- ethers.js library -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script>
+    // IMPORTANT: Replace this with your deployed smart contract address.
+    const CONTRACT_ADDRESS = "PASTE_YOUR_CONTRACT_ADDRESS_HERE";
+
+    // This ABI assumes your Solidity contract has:
+    // function message() public view returns (string memory)
+    const CONTRACT_ABI = [
+      "function message() view returns (string)"
+    ];
+
+    let provider;
+    let signer;
+    let contract;
+
+    const connectButton = document.getElementById("connectButton");
+    const readButton = document.getElementById("readButton");
+    const walletAddress = document.getElementById("walletAddress");
+    const contractMessage = document.getElementById("contractMessage");
+    const statusText = document.getElementById("status");
+
+    connectButton.addEventListener("click", connectWallet);
+    readButton.addEventListener("click", readMessage);
+
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) {
+          throw new Error("MetaMask is not installed. Please install the MetaMask browser extension.");
+        }
+
+        statusText.textContent = "Status: Connecting...";
+        provider = new ethers.BrowserProvider(window.ethereum);
+
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+
+        const address = await signer.getAddress();
+        walletAddress.textContent = address;
+
+        if (CONTRACT_ADDRESS === "PASTE_YOUR_CONTRACT_ADDRESS_HERE") {
+          readButton.disabled = true;
+          statusText.textContent =
+            "Wallet connected. Add your deployed contract address in index.html before reading.";
+          return;
+        }
+
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+        readButton.disabled = false;
+        statusText.textContent = "Status: MetaMask connected successfully.";
+      } catch (error) {
+        statusText.textContent = "Error: " + (error.shortMessage || error.message);
+      }
+    }
+
+    async function readMessage() {
+      try {
+        if (!contract) {
+          throw new Error("Contract is not configured. Add the contract address first.");
+        }
+
+        statusText.textContent = "Status: Reading contract...";
+        const message = await contract.message();
+        contractMessage.textContent = message;
+        statusText.textContent = "Status: Smart contract message loaded.";
+      } catch (error) {
+        statusText.textContent =
+          "Error: " + (error.shortMessage || error.message);
+      }
+    }
+
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", () => {
+        walletAddress.textContent = "Account changed. Please reconnect.";
+        readButton.disabled = true;
+        contract = null;
+        statusText.textContent = "Status: Wallet account changed.";
+      });
+    }
+  </script>
+</body>
+</html>
